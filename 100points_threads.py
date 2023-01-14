@@ -1,4 +1,6 @@
 import os
+import warnings
+
 from bs4 import BeautifulSoup
 import requests
 import fake_useragent
@@ -32,8 +34,11 @@ class PreProcessorMixIn:
             data = file.readlines()
 
         for record in data:
+            if '\t' not in record:
+                warnings.warn(f'Неправильный формат входных данных!\nРазделяйте учеников и оценки табуляцией\n{record}')
+                continue
             split_record = record.split('\t')
-            name = split_record[0]
+            name = split_record[0].strip()
             pre_processed[name] = int(split_record[1])
 
         return pre_processed
@@ -57,7 +62,7 @@ class ParsePoints(PreProcessorMixIn):
     """
     LINK = 'https://api.100points.ru/login'
     INPUT_LIVES = 'example.txt'
-    CONSOLE_OUT = False
+    CONSOLE_OUT = True
 
     def __init__(self):
         self.data = None
@@ -155,13 +160,17 @@ class ParsePoints(PreProcessorMixIn):
         """
         data = self.pre_process(ParsePoints.INPUT_LIVES)
         for name in data:
-            j_lives = data[name]
-            s_lives = int(self.__students[name]['lives']) if self.__students[name]['lives'].isdigit() else None
-            if s_lives is not None and j_lives != s_lives:
-                diff = s_lives - j_lives
-                self.__normalize_lives(name, diff)
-                if ParsePoints.CONSOLE_OUT:
-                    print(f'\n{name} теперь имеет {data[name]} жизней на сайте')
+            try:
+                j_lives = data[name]
+                s_lives = int(self.__students[name]['lives']) if self.__students[name]['lives'].isdigit() else None
+                if s_lives is not None and j_lives != s_lives:
+                    diff = s_lives - j_lives
+                    self.__normalize_lives(name, diff)
+                    if ParsePoints.CONSOLE_OUT:
+                        print(f'\n{name} теперь имеет {data[name]} жизней на сайте')
+            except KeyError:
+                warnings.warn(f'Ученика {name} нет на сайте!')
+                continue
             self.__students[name]['lives'] = str(j_lives)
 
 
