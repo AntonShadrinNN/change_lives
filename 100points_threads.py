@@ -8,6 +8,8 @@ from multiprocessing import Pool, cpu_count
 from time import time
 import json
 
+FILE = 'names_matrix.txt'
+
 
 def timer(func):
 
@@ -61,7 +63,7 @@ class ParsePoints(PreProcessorMixIn):
             __normalize_lives(name, diff)
     """
     LINK = 'https://api.100points.ru/login'
-    INPUT_LIVES = 'example.txt'
+    INPUT_LIVES = 'clm.txt'
     CONSOLE_OUT = True
 
     def __init__(self):
@@ -79,11 +81,11 @@ class ParsePoints(PreProcessorMixIn):
         ident = self.__students[name]['id']
         if diff > 0:
             while diff > 0:
-                self.session.get(f'{base_link}/remove_live/36/{ident}')
+                self.session.get(f'{base_link}/remove_live/84/{ident}')
                 diff -= 1
         else:
             while diff < 0:
-                self.session.get(f'{base_link}/add_live/36/{ident}')
+                self.session.get(f'{base_link}/add_live/84/{ident}')
                 diff += 1
 
     def _parse_life(self, student):
@@ -103,6 +105,56 @@ class ParsePoints(PreProcessorMixIn):
             print(f'{name} имеет {lives} {"жизнь" if lives == 1 else "жизней"} на сайте')
 
         return name, lives
+
+    def print_result(self):
+        with open(FILE, encoding='utf-8') as file:
+            data = file.readlines()
+
+        for line in data:
+            student = line.strip()
+            done = True if student.strip() in self.__students else False
+            if not done:
+                print()
+                continue
+            easy = self.__students[student]['Базовый уровень'] if 'Базовый уровень' in self.__students[student] else ''
+            medium = self.__students[student]['Средний уровень'] if 'Средний уровень' in self.__students[student] else ''
+            hard = self.__students[student]['Сложный уровень'] if 'Сложный уровень' in self.__students[student] else ''
+            print(f'{easy}\t{medium}\t{hard}')
+
+    def parse_homework(self, url):
+        n = 1
+        is_next_page = None
+
+        while not is_next_page:
+            response = self.session.get(f'{url}&page={n}')
+            soup = BeautifulSoup(response.text, 'lxml')
+
+            block = soup.find_all('tr', class_='odd')
+            for element in block:
+                link = element.find('td').find('a').get('href')
+                bl = element.find_all('td')
+                name = bl[2].find('div').text
+                level = bl[-2].find_all('div')[-1].find('small').find('b').text
+                try:
+                    self.__students[name][level] = 0
+                except KeyError:
+                    self.__students[name] = {'name': name,
+                                             level: 0}
+                data = self.session.get(link).text
+                new_soup = BeautifulSoup(data, 'lxml')
+                card = new_soup.find('div', class_='card-body').find('div', class_='row').find_all('div', class_='form-group')
+                marks = card[-1].find('div').find_next('div').text.split()[-1].strip().split('/')[0]
+                self.__students[name][level] = marks
+            try:
+                is_next_page = soup.find('li', id='example2_next').find('a').get('disabled')
+            except Exception:
+                break
+            n += 1
+
+        self.print_result()
+
+
+
 
     def auth(self, email: str, password: str):
         """
@@ -189,16 +241,16 @@ def console_interface():
     session.auth(email, password)
 
     action = input('\nВведите parse для мониторинга жизней(Убедитесь, что CONSOLE_OUT = True)'
-                   '\nВведите change для изменения жизней: ')
+                   '\nВведите change для изменения жизней'
+                   '\nВведите homework для парсинга дз: ')
     if action == 'parse':
         session.parse_lives()
     elif action == 'change':
         session.parse_lives()
         session.change_lives()
-    else:
-        print('Введите корректную комманду!')
-
-    os.startfile('bye.jpg')
+    elif action == 'homework':
+        url = input('Введите url: ')
+        session.parse_homework(url)
 
 
 if __name__ == '__main__':
