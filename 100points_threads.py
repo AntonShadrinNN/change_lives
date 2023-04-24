@@ -7,8 +7,9 @@ import fake_useragent
 from multiprocessing import Pool, cpu_count
 from time import time
 import json
+from pyperclip import copy as clipboard_copy
 
-FILE = 'names_matrix.txt'
+FILE = 'names.txt'
 
 
 def timer(func):
@@ -107,6 +108,7 @@ class ParsePoints(PreProcessorMixIn):
         return name, lives
 
     def print_result(self):
+        marks = ""
         with open(FILE, encoding='utf-8') as file:
             data = file.readlines()
 
@@ -114,12 +116,16 @@ class ParsePoints(PreProcessorMixIn):
             student = line.strip()
             done = True if student.strip() in self.__students else False
             if not done:
+                marks += '\n'
                 print()
                 continue
             easy = self.__students[student]['Базовый уровень'] if 'Базовый уровень' in self.__students[student] else ''
             medium = self.__students[student]['Средний уровень'] if 'Средний уровень' in self.__students[student] else ''
             hard = self.__students[student]['Сложный уровень'] if 'Сложный уровень' in self.__students[student] else ''
-            print(f'{easy}\t{medium}\t{hard}')
+            marks += f'{easy}\t{medium}\t{hard}'.strip() + '\n'
+            print(f'{easy}\t{medium}\t{hard}'.strip())
+        print(marks)
+        clipboard_copy(marks)
 
     def parse_homework(self, url):
         n = 1
